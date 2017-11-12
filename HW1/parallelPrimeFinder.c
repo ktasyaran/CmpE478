@@ -21,7 +21,7 @@
 #define CHUNK_SIZE 7000
 //Max thread number for machine i.e (1, 2, 4, 8)
 #define MAX_LIM 4
-//Max scheduler type for openmp (dynamic, static and guided. auto is ignored.)
+//scheduler types for openmp (dynamic, static and guided. auto is ignored although it exists.)
 #define MAX_SCH 3
 
 //Some initialization.
@@ -175,8 +175,7 @@ int main(int argc, char**argv){
 	fclose(fp);
 	fp=fopen(ORDERED_PRIMES,"w");
 	/*
-		Bubble sort algorithm to sort the big prime numbers array (the used part of course). Uncomment it to sort and print the 
-		result. It is for debugging and requirement.
+		Bubble sort algorithm to sort the big prime numbers array (the used part of course).
 	*/
 	fprintf(fp, "%lld\n",newones);
 	for(ort=0;ort<newones-1;ort++){
@@ -189,7 +188,7 @@ int main(int argc, char**argv){
 		}
 	}
 	/*
-		Prints output to file in chunks of 20.
+		Prints output to file in chunks of given chunk size.
 	*/
 	for(ort=0;ort<newones;ort++){
 		
