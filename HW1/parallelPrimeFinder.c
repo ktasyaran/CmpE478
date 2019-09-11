@@ -34,10 +34,6 @@ atomic_ulong newones;
 
 static unsigned long long int primes[PRIME_SIZE];
 
-/* 
-Check primality of numbers. Runs O(log max{a,b}) time.
-*/
-
 int gcd(unsigned long long int a, unsigned long long int b){
 	unsigned long long int r;
 	while(b!=0){
@@ -50,6 +46,7 @@ int gcd(unsigned long long int a, unsigned long long int b){
 int cmpfunc (const void * a, const void * b) {
 	return ( *(int*)a - *(int*)b );
  }
+
 /*
 Prime number finder up to number N using openMP N will be very large.
 */
@@ -58,7 +55,7 @@ int main(int argc, char**argv){
 	unsigned long long int N,mySQT,ort,ort1;
 	int k,s;
 	firstused=0;
-	FILE * fp=NULL;
+	FILE * fp;
 	char currentdir[PATH_MAX];
 	char* schedulers[3]={"static","dynami","guided"};
 	/*
@@ -88,10 +85,9 @@ int main(int argc, char**argv){
 	*/
 
     //Base time for sequential generation. It will run once. This base time will be added to others for calculating speedup.
- 
-  seq_start = omp_get_wtime() ; 
+  	seq_start = omp_get_wtime() ; 
 	for(i=3;i<=mySQT;i+=2){
-		for(j=0;j<firstused;j++){
+		for(j=0;j<firstused;++j){
 			my_gcd=gcd(i,primes[j]);
 			if(my_gcd!=1){	
 				break;
@@ -107,7 +103,7 @@ int main(int argc, char**argv){
 	//Base difference time for sequential start and sequential end.
 	diff_t=seq_end-seq_start;
 	//Setting first iteration for sqrt(N).
-	mySQT=mySQT+((mySQT & 0x1)==0 ? 1:2);
+	mySQT+=((mySQT & 0x1)==0 ? 1:2);
 	
 	//tid=omp_get_thread_num();
 	/*
@@ -135,7 +131,7 @@ int main(int argc, char**argv){
 		double times[4];
 		times[0]=times[1]=times[2]=times[3]=diff_t;
 		//This loop is for setting number of threads.
-		for(s=0;s<MAX_LIM;s++){
+		for(s=0;s<MAX_LIM;++s){
 		//Times for parallel start and parallel end.
 		double par_start, par_end;
 		
@@ -150,7 +146,7 @@ int main(int argc, char**argv){
 				/*Since there are no even numbers in iterations, dividing to 2 is needless. Therefore, division and
 				modulo comparison will start from 3 (firstused[1]).
 				*/
-				for(j=1;j<firstused;j++){
+				for(j=1;j<firstused;++j){
 					//Private remainder to check modulo.
 					rem=i%primes[j];
 					if(rem==0){
@@ -159,7 +155,6 @@ int main(int argc, char**argv){
 				}
 			
 				if(j==firstused){
-				//mutex lock for exclusive write. Inside this lock and unlock statements is critical section.
 				omp_set_lock(&writelock);
 				primes[newones]=i;
 				omp_unset_lock(&writelock);
@@ -177,12 +172,8 @@ int main(int argc, char**argv){
 }
 	//lock destruction.
 	omp_destroy_lock(&writelock);
-	//Closes output file.
 	fclose(fp);
 	fp=fopen(ORDERED_PRIMES,"w");
-	/*
-		Bubble sort algorithm to sort the big prime numbers array (the used part of course).
-	*/
 	fprintf(fp, "%lld\n",newones);
 	/*
 		Prints output to file in chunks of given chunk size.
@@ -197,5 +188,5 @@ int main(int argc, char**argv){
 		}
 	}
 	fclose(fp);
-	return 0;
+	return EXIT_SUCCESS;
 }
