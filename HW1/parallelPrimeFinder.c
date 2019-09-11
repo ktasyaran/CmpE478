@@ -6,6 +6,9 @@
 #include <pwd.h>
 #include <string.h>
 #include <time.h>
+#include <stdatomic.h>
+#include <errno.h>
+#include <limits.h>
 
 //Output file name.
 #define FILENAME "/omp_result.csv"
@@ -15,7 +18,7 @@
 #define OUT_CHUNK 20
 //Number of primes predefined for larger n to create prime array.
 #define PRIME_SIZE 1000000000
-//First thread number for sequential. It will be increased in loop via right shifting.
+//First thread number for sequential. It will be increased in loop via left shifting.
 #define FIRST_THREAD_NUM 1
 //Default chunk size.
 #define CHUNK_SIZE 7000
@@ -25,14 +28,14 @@
 #define MAX_SCH 3
 
 //Some initialization.
-unsigned long long int i,j,newones,firstused;
+unsigned long long int i,j,firstused;
+atomic_ulong newones;
 #pragma omp threadprivate(i,j)
-char* homedir;
-char* schedulers[3]={"static","dynami","guided"};
-unsigned long long int primes[PRIME_SIZE];
 
-/*
-Gcd algorithm to check primality of numbers in sequential part. Runs O(log max{a,b}) time.
+static unsigned long long int primes[PRIME_SIZE];
+
+/* 
+Check primality of numbers. Runs O(log max{a,b}) time.
 */
 
 int gcd(unsigned long long int a, unsigned long long int b){
@@ -44,7 +47,9 @@ int gcd(unsigned long long int a, unsigned long long int b){
 	}
 	return a;
 }
-
+int cmpfunc (const void * a, const void * b) {
+	return ( *(int*)a - *(int*)b );
+ }
 /*
 Prime number finder up to number N using openMP N will be very large.
 */
@@ -54,13 +59,15 @@ int main(int argc, char**argv){
 	int k,s;
 	firstused=0;
 	FILE * fp=NULL;
+	char currentdir[PATH_MAX];
+	char* schedulers[3]={"static","dynami","guided"};
 	/*
 		This part also includes some definition.
 	*/
-	if((homedir=getenv("HOME"))==NULL){
-		homedir=getpwuid(getuid())->pw_dir;
-	}
-	fp=fopen(strcat(homedir,FILENAME),"w");
+	getcwd(currentdir,sizeof(currentdir));
+	
+	fp=fopen(strcat(currentdir,FILENAME),"w");
+	
     fprintf(fp,"%s\t\t%s\t%s\t%s\t\t%s\t\t%s\t\t%s\t\t%s\t\t%s\t\t%s\n","M","Scheduler","Chunk","T1","T2","T4","T8","S2","S4","S8");
 	N=atoi(argv[1]);
 	primes[0]=2;
@@ -112,7 +119,7 @@ int main(int argc, char**argv){
 	This is scheduler setter loop. 3 Scheduler type is used: Static, dynamic and guided. Auto is ignored because auto 
 	ignores chunk size.
 	*/
-		for(k=0;k<MAX_SCH;k++){
+		for(k=0;k<MAX_SCH;++k){
 			
 			fprintf(fp,"%lld\t%s\t%d\t",N,schedulers[k],CHUNK_SIZE);
 		/*
@@ -147,8 +154,7 @@ int main(int argc, char**argv){
 					//Private remainder to check modulo.
 					rem=i%primes[j];
 					if(rem==0){
-					
-						j=firstused*2;
+						j=(firstused<<1);
 					}	
 				}
 			
@@ -156,8 +162,8 @@ int main(int argc, char**argv){
 				//mutex lock for exclusive write. Inside this lock and unlock statements is critical section.
 				omp_set_lock(&writelock);
 				primes[newones]=i;
-				newones++;
 				omp_unset_lock(&writelock);
+				newones++;
 				}
 			
 			}
@@ -178,19 +184,11 @@ int main(int argc, char**argv){
 		Bubble sort algorithm to sort the big prime numbers array (the used part of course).
 	*/
 	fprintf(fp, "%lld\n",newones);
-	for(ort=0;ort<newones-1;ort++){
-		for(ort1=0;ort1<newones-1-ort;ort1++){
-			if(primes[ort1]>primes[ort1+1]){
-				primes[ort1]=primes[ort1]^primes[ort1+1];
-				primes[ort1+1]=primes[ort1]^primes[ort1+1];
-				primes[ort1]=primes[ort1]^primes[ort1+1];
-			}
-		}
-	}
 	/*
 		Prints output to file in chunks of given chunk size.
 	*/
-	for(ort=0;ort<newones;ort++){
+    qsort((void*)primes,newones,sizeof(primes[0]),cmpfunc);
+	for(ort=0;ort<newones;++ort){
 		
 		if(ort%OUT_CHUNK==0 && ort>0){
 			fprintf(fp, "%lld\n",primes[ort]);
