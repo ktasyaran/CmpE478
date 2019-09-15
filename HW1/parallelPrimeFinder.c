@@ -28,14 +28,13 @@
 #define MAX_SCH 3
 
 //Some initialization.
-unsigned long long int i,j,firstused;
-atomic_ulong newones;
+unsigned long i,j;
+
 #pragma omp threadprivate(i,j)
+static unsigned long primes[PRIME_SIZE];
 
-static unsigned long long int primes[PRIME_SIZE];
-
-int gcd(unsigned long long int a, unsigned long long int b){
-	unsigned long long int r;
+int gcd(unsigned long  a, unsigned long b){
+	unsigned long r;
 	while(b!=0){
 		r=a%b;
 		a=b;
@@ -44,7 +43,7 @@ int gcd(unsigned long long int a, unsigned long long int b){
 	return a;
 }
 int cmpfunc (const void * a, const void * b) {
-	return ( *(int*)a - *(int*)b );
+	return ( *(unsigned long *)a - *(unsigned long*)b );
  }
 
 /*
@@ -52,9 +51,10 @@ Prime number finder up to number N using openMP N will be very large.
 */
 
 int main(int argc, char**argv){
-	unsigned long long int N,mySQT,ort,ort1;
-	int k,s;
-	firstused=0;
+	unsigned long N,mySQT,ort,ort1;
+	long k,s;
+	int firstused=0;
+	atomic_ulong newones = 0;
 	FILE * fp;
 	char currentdir[PATH_MAX];
 	char* schedulers[3]={"static","dynami","guided"};
@@ -75,7 +75,7 @@ int main(int argc, char**argv){
 	omp_lock_t writelock;
 	//Mutex lock initialization.
 	omp_init_lock(&writelock);
-	unsigned long long int my_gcd,rem;
+	unsigned long my_gcd,rem;
 	// To get time difference from start to end for sequential case (from 3 to sqrt(N)).
 	 double seq_start,seq_end;
      double diff_t;
@@ -117,7 +117,7 @@ int main(int argc, char**argv){
 	*/
 		for(k=0;k<MAX_SCH;++k){
 			
-			fprintf(fp,"%lld\t%s\t%d\t",N,schedulers[k],CHUNK_SIZE);
+			fprintf(fp,"%ld\t%s\t%d\t",N,schedulers[k],CHUNK_SIZE);
 		/*
 			Schedule setter part. Depends on k, respective schedule will set with chunk size.
 		*/
@@ -174,7 +174,7 @@ int main(int argc, char**argv){
 	omp_destroy_lock(&writelock);
 	fclose(fp);
 	fp=fopen(ORDERED_PRIMES,"w");
-	fprintf(fp, "%lld\n",newones);
+	fprintf(fp, "%ld\n",newones);
 	/*
 		Prints output to file in chunks of given chunk size.
 	*/
@@ -182,9 +182,9 @@ int main(int argc, char**argv){
 	for(ort=0;ort<newones;++ort){
 		
 		if(ort%OUT_CHUNK==0 && ort>0){
-			fprintf(fp, "%lld\n",primes[ort]);
+			fprintf(fp, "%ld\n",primes[ort]);
 		}else{
-			fprintf(fp, "%lld ",primes[ort]);
+			fprintf(fp, "%ld ",primes[ort]);
 		}
 	}
 	fclose(fp);
